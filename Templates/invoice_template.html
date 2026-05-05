@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice - {{ invoice_number }}</title>
+    <style>
+        /* PDF Page Setup */
+        @page {
+            size: a4 portrait;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 13px;
+            color: #333333;
+            line-height: 1.4;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        /* --- Header Section --- */
+        .header-table {
+            margin-bottom: 30px;
+        }
+        .company-name {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50; /* Deep Navy Blue */
+            margin-bottom: 5px;
+        }
+        .company-details {
+            color: #7f8c8d;
+            font-size: 11px;
+        }
+        .invoice-title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3498db; /* Accent Blue */
+            text-align: right;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+        .invoice-meta {
+            text-align: right;
+            font-size: 12px;
+            color: #555;
+        }
+
+        /* --- Divider --- */
+        .divider {
+            border-bottom: 2px solid #ecf0f1;
+            margin-bottom: 30px;
+        }
+
+        /* --- Client Info Section --- */
+        .info-table {
+            margin-bottom: 40px;
+        }
+        .info-table td {
+            vertical-align: top;
+        }
+        .section-heading {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2c3e50;
+            text-transform: uppercase;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            width: 90%;
+        }
+        .client-details {
+            font-size: 13px;
+            color: #444;
+        }
+
+        /* --- Items Table --- */
+        .items-table {
+            margin-bottom: 30px;
+        }
+        .items-table th {
+            background-color: #2c3e50;
+            color: #ffffff;
+            padding: 12px 10px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .items-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #ecf0f1;
+            color: #333;
+        }
+        .items-table .amount {
+            text-align: right;
+        }
+
+        /* --- Totals Section --- */
+        .totals-table {
+            width: 50%;
+            margin-left: 50%; /* Pushes table to the right */
+        }
+        .totals-table td {
+            padding: 10px;
+            text-align: right;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        .totals-table .grand-total {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            background-color: #f8f9fa;
+        }
+        .totals-table .grand-total td {
+            border-bottom: 2px solid #2c3e50;
+        }
+
+        /* --- Footer --- */
+        .footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 11px;
+            color: #95a5a6;
+            border-top: 1px solid #ecf0f1;
+            padding-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <table class="header-table">
+        <tr>
+            <td width="50%">
+                <div class="company-name">MithilaRoots</div>
+                <div class="company-details">
+                    Ahmedabad, Gujarat, India<br>
+                    Email: support@mithilaroots.com<br>
+                    Phone: +91 98765 43210
+                </div>
+            </td>
+            <td width="50%">
+                <div class="invoice-title">Invoice</div>
+                <div class="invoice-meta">
+                    <strong>Invoice No:</strong> {{ invoice_number }}<br>
+                    <strong>Date:</strong> {{ date }}<br>
+                    <strong>Order ID:</strong> {{ order.orders_id }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Bill To / Ship To -->
+    <table class="info-table">
+        <tr>
+            <td width="50%">
+                <div class="section-heading">Bill To</div>
+                <div class="client-details">
+                    <strong>Name:</strong> {{ user.username }} <br>
+                    <strong>Email:</strong> {{ user.email }}<br>
+                    <strong>Customer ID:</strong> {{ user.user_id }}
+                </div>
+            </td>
+            <td width="50%">
+                <div class="section-heading">Shipping Address</div>
+                <div class="client-details">
+                    {{ address.street_address }}<br>
+                    {{ address.city }}, {{ address.state }} - {{ address.pincode }}<br><br>
+                    <strong>Payment Method:</strong> <span style="color: #e74c3c; font-weight: bold;">{{ order.payment_method | upper }}</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Items List -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Item ID</th>
+                <th>Item Name</th>
+                <th style="text-align: center;">Qty</th>
+                <th class="amount">Unit Price</th>
+                <th class="amount">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>#{{ item.item_id }}</td>
+                <td><strong>{{ item.name }}</strong></td>
+                <td style="text-align: center;">{{ item.quantity }}</td>
+                <td class="amount">₹{{ "%.2f"|format(item.unit_price) }}</td>
+                <td class="amount">₹{{ "%.2f"|format(item.total_price) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals -->
+    <table class="totals-table">
+        <tr>
+            <td width="60%">Subtotal:</td>
+            <td width="40%">₹{{ "%.2f"|format(order.total_amount) }}</td>
+        </tr>
+        <tr>
+            <td>Tax (0%):</td>
+            <td>₹0.00</td>
+        </tr>
+        <tr class="grand-total">
+            <td>Grand Total:</td>
+            <td>₹{{ "%.2f"|format(order.total_amount) }}</td>
+        </tr>
+    </table>
+
+    <!-- Footer -->
+    <div class="footer">
+        <strong>Thank you for shopping with MithilaRoots!</strong><br>
+        If you have any questions concerning this invoice, contact our support team.<br>
+        <em>This is a computer-generated invoice and does not require a physical signature.</em>
+    </div>
+
+</body>
+</html>
