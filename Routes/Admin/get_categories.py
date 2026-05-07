@@ -6,7 +6,7 @@ def get_all_categories_fn():
     # 1. Check if user is Admin
     claims = get_jwt()
     if claims.get('role') != 1:
-        return jsonify({"message": "Access Denied! Only Admin can view this."}), 403
+        return jsonify({"message": "Access Denied! Only Admin can view this."}), 401
 
     # 2. Fetch all categories from database
     categories = Category.query.filter_by(is_active=True).all()

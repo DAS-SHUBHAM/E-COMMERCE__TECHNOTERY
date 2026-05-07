@@ -49,6 +49,9 @@ from Routes.User.get_address import get_addresses_fn
 
 # Payment Route- create_payment_order, verify_payment_order (Authorization- User)
 from Routes.User.razorpay_payment import create_payment_order_fn, verify_payment_fn
+from Routes.User.reviews import get_product_reviews_fn, add_review_fn
+from Routes.User.wishlist import toggle_wishlist_fn, get_wishlist_fn
+
 
 def create_app():
     app = Flask(__name__)
@@ -107,7 +110,14 @@ def create_app():
     app.add_url_rule('/api/user/addresses', view_func=get_addresses_fn, methods=['GET'])         
     app.add_url_rule('/api/payment/create/<string:order_uuid>', view_func=create_payment_order_fn, methods=['POST'])
     app.add_url_rule('/api/payment/verify', view_func=verify_payment_fn, methods=['POST'])
-
+    
+    # Wishlist Routes
+    app.route('/api/user/wishlist/toggle/<string:product_uuid>', methods=['POST'])(toggle_wishlist_fn)
+    app.add_url_rule('/api/user/wishlist', view_func=jwt_required()(get_wishlist_fn), methods=['GET'])
+    
+    # Review Routes
+    app.route('/api/user/reviews/add/<string:product_uuid>', methods=['POST'])(add_review_fn)
+    app.route('/api/public/reviews/<string:product_uuid>', methods=['GET'])(get_product_reviews_fn)
     return app
 
 if __name__ == "__main__":

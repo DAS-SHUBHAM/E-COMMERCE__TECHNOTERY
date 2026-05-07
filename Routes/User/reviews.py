@@ -2,45 +2,39 @@ from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from extensions import db
 from datetime import datetime
-
-# Import models
+import uuid
 from Models.post_sales_model import Review
 from Models.product_models import Product
 from Models.user_models import User
 
 @jwt_required()
-def add_review_fn(product_id):
-    """
-    To add a review to a product: if the user has already given a review, it will be updated.
-    """
+def add_review_fn(product_uuid): # Updated to product_uuid
     user_id = get_jwt_identity()
     data = request.get_json()
     
     rating = data.get('rating')
     comment = data.get('comment')
 
-    # Validation: Rating should be in between 1 to 5
     if not rating or not (1 <= int(rating) <= 5):
         return jsonify({"message": "Please provide a valid rating between 1 and 5"}), 400
 
-    product = Product.query.get(product_id)
+    # Product ko UUID se dhundein
+    product = Product.query.filter_by(uuid=product_uuid).first()
     if not product:
         return jsonify({"message": "Product not found"}), 404
 
-    # Check if review already exists for this user and product
-    existing_review = Review.query.filter_by(user_id=user_id, product_id=product_id).first()
+    existing_review = Review.query.filter_by(user_id=user_id, product_id=product.product_id).first()
     
     if existing_review:
-        # Update old review
         existing_review.rating = int(rating)
         existing_review.comment = comment
-        existing_review.created_at = datetime.utcnow() # Update timestamp
+        existing_review.created_at = datetime.utcnow()
         message = "Review updated successfully"
     else:
-        # Create new review
         new_review = Review(
+            uuid=str(uuid.uuid4()), # Naya UUID assign kiya
             user_id=user_id,
-            product_id=product_id,
+            product_id=product.product_id,
             rating=int(rating),
             comment=comment
         )
@@ -55,16 +49,12 @@ def add_review_fn(product_id):
         return jsonify({"message": "Error saving review", "error": str(e)}), 500
 
 
-def get_product_reviews_fn(product_id):
-    """
-    Kisi product ke saare reviews dekhne ke liye (Bina login kiye).
-    """
-    # Check if product exists
-    product = Product.query.get(product_id)
+def get_product_reviews_fn(product_uuid): # Updated to product_uuid
+    product = Product.query.filter_by(uuid=product_uuid).first()
     if not product:
         return jsonify({"message": "Product not found"}), 404
 
-    reviews = Review.query.filter_by(product_id=product_id).order_by(Review.created_at.desc()).all()
+    reviews = Review.query.filter_by(product_id=product.product_id).order_by(Review.created_at.desc()).all()
     
     if not reviews:
         return jsonify({"message": "No reviews yet for this product", "reviews": []}), 200
@@ -75,15 +65,14 @@ def get_product_reviews_fn(product_id):
     for r in reviews:
         user = User.query.get(r.user_id)
         review_data.append({
-            "review_id": r.review_id,
+            "review_uuid": r.uuid, # Ab review_id ki jagah uuid bhejenge
             "username": user.username if user else "Unknown User",
             "rating": r.rating,
             "comment": r.comment,
-            "date": r.created_at.strftime("%d %B, %Y") # e.g. 01 May, 2026
+            "date": r.created_at.strftime("%d %B, %Y")
         })
         total_rating += r.rating
         
-    # Calculate Average Rating
     avg_rating = round(total_rating / len(reviews), 1)
 
     return jsonify({

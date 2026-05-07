@@ -1,13 +1,14 @@
 import os
 import json
-import uuid  # Added to generate unique IDs
+import uuid
 from werkzeug.utils import secure_filename
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from extensions import db
 from Models.product_models import Product, SellerCategory, ProductImage, Specification
+from datetime import datetime
 
-# Define allowed image types
+# Allowed image extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
 def allowed_file(filename):
@@ -15,21 +16,47 @@ def allowed_file(filename):
 
 @jwt_required()
 def add_product_fn():
+    """
+    Seller-only API to add a new product. 
+    Includes strict validation for price, stock, category approval, and image uploads.
+    """
     claims = get_jwt()
-    # Check if user is a seller (role_id 2)
+    
+    # 1. Role Validation: Ensure the user is a Seller (Role 2)
     if claims.get('role') != 2: 
-        return jsonify({"message": "Only sellers can add products"}), 403
+        return jsonify({"message": "Access Denied! Only sellers can list products."}), 403
 
     seller_id = int(get_jwt_identity())
     
-    # 1. READ TEXT DATA FROM FORM
+    # 2. Extract Form Data
     name = request.form.get('name')
     description = request.form.get('description')
-    price = request.form.get('price')
-    stock = request.form.get('stock')
-    category_id = request.form.get('category_id')
+    price_raw = request.form.get('price')
+    stock_raw = request.form.get('stock')
+    category_id_raw = request.form.get('category_id')
 
-    # Security check: ensure category is approved for this seller
+    # 3. Mandatory Fields Validation: Check if any required field is empty
+    if not all([name, price_raw, stock_raw, category_id_raw]):
+        return jsonify({"message": "Missing required fields: name, price, stock, and category_id are mandatory."}), 400
+
+    # 4. Numerical Validations (Price and Stock)
+    try:
+        price = float(price_raw)
+        stock = int(stock_raw)
+        category_id = int(category_id_raw)
+
+        # Logical Check: Price cannot be zero or negative
+        if price <= 0:
+            return jsonify({"message": "Invalid Price! Price must be a positive number greater than zero."}), 400
+        
+        # Logical Check: Stock cannot be negative
+        if stock < 0:
+            return jsonify({"message": "Invalid Stock! Stock cannot be a negative value."}), 400
+
+    except ValueError:
+        return jsonify({"message": "Data Type Error! Price must be a decimal and Stock/Category must be integers."}), 400
+
+    # 5. Security Check: Verify if the seller is approved for this specific category
     approval_check = SellerCategory.query.filter_by(
         seller_id=seller_id, 
         category_id=category_id, 
@@ -38,30 +65,31 @@ def add_product_fn():
     ).first()
 
     if not approval_check:
-        return jsonify({"message": "Access Denied! You are not approved for this category."}), 403
+        return jsonify({"message": "Unauthorized Category! You are not approved to sell products in this category."}), 403
 
     try:
-        # A. ENTRY IN PRODUCT TABLE
+        # A. Create Product Entry
         new_product = Product(
-            uuid=str(uuid.uuid4()), # Generate UUID if not handled by DB default
+            uuid=str(uuid.uuid4()),
             name=name,
             description=description,
-            price=float(price),
-            stock=int(stock),
-            category_id=int(category_id),
+            price=price,
+            stock=stock,
+            category_id=category_id,
             seller_id=seller_id,
             is_active=True
         )
         db.session.add(new_product)
-        db.session.flush() # Generate product_id for child tables
+        db.session.flush() # Flush to get new_product.product_id
 
-        # B. ENTRY IN SPECIFICATION TABLE
+        # B. Handle Specifications (JSON Validation)
         spec_string = request.form.get('specification', '[]')
-        specifications = json.loads(spec_string) 
+        try:
+            specifications = json.loads(spec_string)
+        except json.JSONDecodeError:
+            return jsonify({"message": "Format Error! Specifications must be a valid JSON string."}), 400
         
         for spec in specifications:
-            # FIX: Ensure these match your database column names exactly
-            # and use the same keys you send in Postman
             new_spec = Specification(
                 product_id=new_product.product_id, 
                 spec_key=spec.get('spec_key'),   
@@ -69,40 +97,44 @@ def add_product_fn():
             )
             db.session.add(new_spec)
 
-        # C. ENTRY IN PRODUCT IMAGES TABLE
+        # C. Handle Image Uploads
         images = request.files.getlist('images')
-        
-        # Automatic folder creation
+        if not images or len(images) == 0:
+            return jsonify({"message": "Product images are required. Please upload at least one image."}), 400
+
         upload_folder = os.path.join(os.getcwd(), 'static', 'uploads', 'products')
         os.makedirs(upload_folder, exist_ok=True) 
 
         for index, file in enumerate(images):
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
-                unique_filename = f"prod_{new_product.product_id}_{filename}"
+                # Create a unique filename to avoid overwriting
+                unique_filename = f"prod_{new_product.product_id}_{uuid.uuid4().hex[:8]}_{filename}"
                 file_path = os.path.join(upload_folder, unique_filename)
                 
-                # Save physical file
                 file.save(file_path)
 
-                # Save relative path for frontend access
+                # Store relative URL for database
                 db_image_url = f"/static/uploads/products/{unique_filename}"
                 
                 new_image = ProductImage(
                     product_id=new_product.product_id,
                     image_url=db_image_url,
-                    is_primary=(index == 0) 
+                    is_primary=(index == 0) # First image is set as primary
                 )
                 db.session.add(new_image)
 
+        # Final Database Commit
         db.session.commit()
 
         return jsonify({
-            "message": "Product added successfully with local images!",
+            "message": "Product added successfully with all details and images!",
             "product_uuid": new_product.uuid
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        # Returns the specific error for debugging
-        return jsonify({"message": "Failed to add product", "error": str(e)}), 500
+        return jsonify({
+            "message": "Transaction Failed! Product could not be added.",
+            "error": str(e)
+        }), 500

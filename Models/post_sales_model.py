@@ -39,6 +39,7 @@ class Wishlist(db.Model):
     wishlist_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'))
     product_id = db.Column(db.Integer, db.ForeignKey('product.product_id'))
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
 
 class Review(db.Model):
     __tablename__ = 'review'
@@ -48,3 +49,4 @@ class Review(db.Model):
     rating = db.Column(db.Integer)
     comment = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
