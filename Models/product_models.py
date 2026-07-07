@@ -18,6 +18,10 @@ class Product(db.Model):
     __tablename__ = 'product'
     product_id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(255), unique=True, default=lambda: str(uuid.uuid4()))
+    
+    # REQUIRED FIELD ADDED: SKU for inventory management and bulk upload tracking
+    sku = db.Column(db.String(100), unique=True, nullable=False)
+    
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Float, nullable=False)
@@ -25,13 +29,14 @@ class Product(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.category_id'), nullable=False)
     seller_id = db.Column(db.Integer, db.ForeignKey('user.user_id'))
     
-    # ADDED: is_approved column with default=True
-    # This ensures that if the category is already seller-approved, 
-    # the product becomes visible immediately.
-    is_approved = db.Column(db.Boolean, default=True) 
-    
+    # Verification flag matching bulk approval business workflow
+    is_approved = db.Column(db.Boolean, default=False) 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relational definitions for cleaner entity joins
+    images = db.relationship('ProductImage', backref='product', lazy=True, cascade="all, delete-orphan")
+    specifications = db.relationship('Specification', backref='product', lazy=True, cascade="all, delete-orphan")
 
 class ProductImage(db.Model):
     __tablename__ = 'product_image'
@@ -63,4 +68,5 @@ class SellerCategory(db.Model):
     updated_by = db.Column(db.Integer, nullable=True) 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
     __table_args__ = (db.UniqueConstraint('seller_id', 'category_id', name='_seller_category_uc'),)

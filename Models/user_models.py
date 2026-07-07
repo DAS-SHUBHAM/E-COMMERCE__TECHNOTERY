@@ -56,24 +56,3 @@ class Address(db.Model):
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-class OTP(db.Model):
-    __tablename__ = 'otp'
-    otp_id = db.Column(db.Integer, primary_key=True)
-    uuid = db.Column(db.String(255), unique=True, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.user_id'), nullable=False)
-    
-    # Note: 'orders.orders_id' refers to the table name 'orders' and column 'orders_id'
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.orders_id'), nullable=True) 
-    
-    otp_code = db.Column(db.String(10), nullable=False)
-    action = db.Column(db.String(50), nullable=False) # verification, password_reset
-    is_used = db.Column(db.Boolean, default=False)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    
-    # Audit Columns
-    created_by = db.Column(db.Integer, nullable=True)
-    updated_by = db.Column(db.Integer, nullable=True)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)

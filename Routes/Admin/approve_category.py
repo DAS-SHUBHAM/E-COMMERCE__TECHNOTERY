@@ -39,20 +39,18 @@ def approve_seller_category_fn(request_uuid):
     try:
         # Mark as approved and log who did it
         category_req.is_approved = True
+        category_req.is_active = True  # FIX: Isko active karna zaroori hai taaki seller is category me products add kar sake
         category_req.updated_by = admin_id
         
         # Optional: If your model has a field for notes, update it here
         # category_req.admin_comments = admin_note 
 
-        # --- IMPORTANT LOGIC ---
-        # If your system has a separate 'Category' table, you would usually 
-        # create a new record there or mark it active here.
-        # -----------------------
-
         db.session.commit()
 
+        # FIX: Hata diya category_req.category_name kyunki ye attribute model me nahi hai.
+        # Agar category ka naam dikhana hi hai, toh category_id use kar sakte hain.
         return jsonify({
-            "message": f"Category request for '{category_req.category_name}' has been approved successfully!"
+            "message": f"Category request for Category ID '{category_req.category_id}' has been approved successfully!"
         }), 200
 
     except Exception as e:

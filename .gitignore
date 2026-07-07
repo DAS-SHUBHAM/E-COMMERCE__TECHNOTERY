@@ -3,3 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+
+# Uploads and testing cache (Kachra saaf rakhne ke liye)
+static/uploads/bulk_temp/
+static/uploads/products/
+*.csv
+*.zip

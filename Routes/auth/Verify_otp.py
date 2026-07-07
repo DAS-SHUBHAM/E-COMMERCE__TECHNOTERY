@@ -1,69 +1,61 @@
 from flask import request, jsonify
-from extensions import db
-from Models.user_models import User, OTP
-from datetime import datetime
+from extensions import db, redis_client  # Imported redis_client for caching layer
+from Models.user_models import User  # Removed OTP table import since it is replaced by Redis
 
 def verify_otp_fn():
     """
-    Handles OTP verification for user/seller accounts.
+    Handles OTP verification for user/seller accounts using Redis.
     Supports edge cases like expired OTPs, already verified accounts, and missing data.
     """
-    
-    # Extract data from the incoming JSON request
-    data = request.get_json()
-    email = data.get('email')
-    code = data.get('otp_code')
-
-    # 1. Validation: Ensure both required fields are present (400 Bad Request)
-    if not email or not code:
-        return jsonify({
-            "message": "Both email and otp_code are mandatory."
-        }), 400
-
-    # 2. Database Check: Verify if the user exists in the system (404 Not Found)
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        return jsonify({
-            "message": "No account associated with this email address."
-        }), 404
-
-    # 3. State Check: Prevent re-verification of already active accounts (409 Conflict)
-    if user.is_verified:
-        return jsonify({
-            "message": "This account has already been verified. Please proceed to login."
-        }), 409
-
-    # 4. OTP Retrieval: Fetch the most recent unused verification OTP for this user
-    otp_record = OTP.query.filter_by(
-        user_id=user.user_id, 
-        otp_code=code, 
-        is_used=False,
-        action="verification"
-    ).order_by(OTP.created_at.desc()).first()
-
-    # 5. Logic Branching: Differentiate between a 'Wrong OTP' and an 'Expired OTP'
-    
-    # Case A: OTP not found (either code is wrong or action/status mismatch)
-    if not otp_record:
-        return jsonify({
-            "message": "Invalid OTP. Please check the code and try again."
-        }), 400
-
-    # Case B: Correct OTP provided but it has passed its expiration time (410 Gone)
-    if otp_record.expires_at < datetime.utcnow():
-        return jsonify({
-            "message": "This OTP has expired. Please request a new verification code."
-        }), 410
-
-    # 6. Finalization: Update database records within a safe transaction block
     try:
+        # Extract data from the incoming JSON request
+        data = request.get_json()
+        email = data.get('email')
+        code = data.get('otp_code')
+
+        # 1. Validation: Ensure both required fields are present (400 Bad Request)
+        if not email or not code:
+            return jsonify({
+                "message": "Both email and otp_code are mandatory."
+            }), 400
+
+        # 2. Database Check: Verify if the user exists in the system (404 Not Found)
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({
+                "message": "No account associated with this email address."
+            }), 404
+
+        # 3. State Check: Prevent re-verification of already active accounts (409 Conflict)
+        if user.is_verified:
+            return jsonify({
+                "message": "This account has already been verified. Please proceed to login."
+            }), 409
+
+        # 4. OTP Retrieval: Extract the cached verification token directly from Redis memory
+        cached_otp = redis_client.get(f"otp:{email}")
+
+        # 5. Logic Branching: Evaluate missing, wrong, or expired states
+        # If the key does not exist, it means the 10-minute TTL expired (410 Gone)
+        if not cached_otp:
+            return jsonify({
+                "message": "This OTP has expired or does not exist. Please request a new verification code."
+            }), 410
+
+        # If the key exists but does not match the user's input parameter (400 Bad Request)
+        if cached_otp != str(code):
+            return jsonify({
+                "message": "Invalid OTP. Please check the code and try again."
+            }), 400
+
+        # 6. Finalization: Update database records within a safe transaction block
         # Mark the user account as active/verified
         user.is_verified = True
         
-        # Deactivate the OTP record so it cannot be reused
-        otp_record.is_used = True
+        # Instantly remove the token key from Redis to prevent duplicate multi-pass replay attempts
+        redis_client.delete(f"otp:{email}")
         
-        # Commit changes to the database
+        # Commit the state modification to the primary MySQL engine
         db.session.commit()
         
         return jsonify({
