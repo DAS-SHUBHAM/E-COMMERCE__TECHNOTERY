@@ -1,5 +1,6 @@
 # E-Commerce Custom Backend Infrastructure Engine
 A production-ready, modular, and highly secure micro-backend built using Python and Flask. This architecture is engineered to handle complex vendor ecosystems, real-time communication modules, secure transaction flows, and isolated multi-asset bulk catalog operations with strict relational data integrity.
+
 ## 🚀 Key Technical Highlights & Architecture
 
 *   **Dynamic Bulk Catalog Ingestion:** Parses multi-part `form-data` streams containing raw CSV manifests and complex `.zip` media archives synchronously without losing track of relational mapping context.
@@ -87,12 +88,16 @@ A production-ready, modular, and highly secure micro-backend built using Python 
 ├── 📄 config.py                           # Application System Profiles & Connection Parameters
 ├── 📄 extensions.py                       # Interlocked global components initialization (db, jwt)
 └── 📄 requirements.txt                    # Comprehensive Project Engine Dependencies Setup
+
 🔧 Installation & Local Environment Setup
+
 1. Clone the Workspace
 Bash
 git clone [https://github.com/DAS-SHUBHAM/E-Commerce__TECHNOTERY.git](https://github.com/DAS-SHUBHAM/E-Commerce__TECHNOTERY.git)
 cd E-Commerce__TECHNOTERY
+
 2. Instantiate and Activate the Virtual Environment
+
 Bash
 # Windows
 python -m venv venv
@@ -101,18 +106,23 @@ python -m venv venv
 # Linux / MacOS
 python3 -m venv venv
 source venv/bin/activate
+
 3. Deploy Project Dependencies
 Bash
 pip install -r requirements.txt
+
 4. Apply Database Version Upgrades
 Ensure your local environment configuration details match your active MySQL database server schema credentials inside .env or config.py, then run:
 
 Bash
 flask db upgrade
+
 5. Boot Up the Local Development Cluster
 Bash
 python app.py
+
 🧪 API Operational Workflows (Key Postman Validation Milestones)
+
 1. Administrative Clearance Pipeline
 Endpoint: PUT /api/admin/approve-category/<request_uuid>
 
